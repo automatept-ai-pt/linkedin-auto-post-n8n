@@ -1,0 +1,961 @@
+{
+  "name": "LinkedIn Auto-Post (Notion → Claude → Telegram approval)",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "dataSourceId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_NOTION_DATABASE_ID",
+          "cachedResultName": "LinkedIn Content"
+        },
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Status|select",
+              "condition": "equals",
+              "optionValue": "Idea"
+            }
+          ]
+        },
+        "options": {
+          "sort": {
+            "sortValue": [
+              {
+                "timestamp": true,
+                "key": "created_time",
+                "direction": "ascending"
+              }
+            ]
+          }
+        }
+      },
+      "id": "8e4ef4cd-7c0b-4838-b7ce-17bb3aed8430",
+      "name": "Idea",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        96,
+        -16
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "notionApi": {
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getMarkdown",
+        "pageId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://www.notion.so/YOUR_PROMPT_TEMPLATE_PAGE_ID"
+        }
+      },
+      "id": "9ddb0943-393a-4ce1-a4ad-03d522dc6751",
+      "name": "prompt template",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        96,
+        240
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "notionApi": {
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id ? 'yes' : 'no' }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "yes"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "abc97f79-4dd4-4cc5-8113-5844c71ff7ae",
+      "name": "Idea?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        464,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "useDataOfInput": "1"
+      },
+      "id": "76c38501-9ed6-4bba-bb05-916011a35c0b",
+      "name": "Idea+template",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        288,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-5",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-5"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ \"Рубрика: \" + $(\"current idea\").item.json[\"property_pillar\"] + \"\\n\" + \"Язык: \" + $(\"current idea\").item.json[\"property_language\"] + \"\\n\" + \"Тема: \" + $(\"current idea\").item.json[\"property_topic\"] + \"\\n\" + \"Заметка: \" + ($(\"current idea\").item.json[\"property_note\"] || \"нет\") + \"\\n\\n\" + \"Напиши черновик поста для LinkedIn по этой теме, строго следуя style guide из system prompt.\" }}"
+            }
+          ]
+        },
+        "options": {
+          "includeMergedResponse": true,
+          "system": "={{ $(\"prompt template\").item.json.markdown }}",
+          "maxTokens": 900
+        }
+      },
+      "id": "4534a222-5d21-4d76-9225-e8f3761c54db",
+      "name": "draft generation",
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        384,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "draft-text",
+              "name": "draftText",
+              "value": "={{ $json.merged_response ?? $json.content ?? $json.text ?? $json.output ?? \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2e467441-6551-4d86-9d12-5f49332a0fca",
+      "name": "extract text",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        720,
+        128
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "d8419c33-bb25-42a8-a2d0-db45daa3d35b",
+      "name": "current idea",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        704,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "dataSourceId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_NOTION_DATABASE_ID",
+          "cachedResultName": "LinkedIn Content"
+        },
+        "limit": 20,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Status|select",
+              "condition": "does_not_equal",
+              "optionValue": "Idea"
+            }
+          ]
+        },
+        "options": {
+          "sort": {
+            "sortValue": [
+              {
+                "timestamp": true,
+                "key": "last_edited_time",
+                "direction": "descending"
+              }
+            ]
+          }
+        }
+      },
+      "id": "ab322970-5f06-4b80-95dc-5ce84f1d9751",
+      "name": "chat history",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        704,
+        400
+      ],
+      "credentials": {
+        "notionApi": {
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "query": "AI automation trends for small business 2026 n8n workflow ideas",
+        "count": 5,
+        "additionalParameters": {}
+      },
+      "id": "5ee86c80-8cd2-47b1-ad56-d8d4464dd316",
+      "name": "Brave Search: trends",
+      "type": "@brave/n8n-nodes-brave-search.braveSearch",
+      "typeVersion": 1.1,
+      "position": [
+        1104,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "hist-text",
+              "name": "historyText",
+              "type": "string",
+              "value": "={{ $input.all().length ? $input.all().map(i => \"- [\" + i.json.property_pillar + \"] \" + i.json.property_topic).join(\"\\n\") : \"(пока нет опубликованных тем)\" }}"
+            },
+            {
+              "id": "last-lang",
+              "name": "lastLanguage",
+              "type": "string",
+              "value": "={{ $input.all().length ? ($input.all()[0].json.property_language || '').toString().toUpperCase() : '' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "36e7f574-5f71-434d-9321-c36b3b66a0d5",
+      "name": "topic history",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        912,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "message": "={{ \"📋 Черновик поста для LinkedIn\\n\\nРубрика: \" + $(\"current idea\").item.json[\"property_pillar\"] + \"\\nТема: \" + $(\"current idea\").item.json[\"property_topic\"] + \"\\n\\n\" + $json.draftText + \"\\n\\n— — —\\nОтветь \\\"ок\\\" (или \\\"да\\\"), чтобы одобрить как есть.\\nИли пришли свой отредактированный текст — он будет использован вместо черновика.\" }}",
+        "responseType": "freeText",
+        "options": {}
+      },
+      "id": "515e9b28-6166-4ca5-8065-2ab63670608a",
+      "name": "send draft and wait for response",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        944,
+        128
+      ],
+      "webhookId": "fe0593ad-b5c5-46f4-9c7d-f944cfb5dc15",
+      "credentials": {
+        "telegramApi": {
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.text.trim().toLowerCase() }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "ok"
+            },
+            {
+              "leftValue": "={{ $json.data.text.trim().toLowerCase() }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "ок"
+            },
+            {
+              "leftValue": "={{ $json.data.text.trim().toLowerCase() }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "да"
+            },
+            {
+              "leftValue": "={{ $json.data.text.trim().toLowerCase() }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "yes"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "912051ac-e431-4774-9d68-cfdd33359cba",
+      "name": "approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1152,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-5",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-5"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ \"Вот список уже использованных тем (не повторяться):\\n\" + $(\"topic history\").item.json.historyText + \"\\n\\nСвежий контекст из веб-поиска (для вдохновения, не копировать дословно):\\n\" + JSON.stringify($json).slice(0,1500) + \"\\n\\nПридумай следующую тему для поста LinkedIn. Выбери одну из 4 рубрик (по возможности не ту же, что использовалась последней в списке выше), сформулируй конкретную тему и короткую заметку-контекст. Ответь СТРОГО одним JSON-объектом без markdown и пояснений: {\\\"pillar\\\":\\\"...\\\",\\\"topic\\\":\\\"...\\\",\\\"language\\\":\\\"...\\\",\\\"note\\\":\\\"...\\\"}. Значение pillar должно быть ровно одним из: Founder/кейсы, Skills для рекрутеров, Идея недели, GitHub/проекты. Значение language ОБЯЗАТЕЛЬНО одно из: EN, PT, EN/PT — контент только на английском и/или португальском, это не подлежит обсуждению, даже если сама эта инструкция на русском. Никогда не указывай RU, русский или любой другой язык.\" }}"
+            }
+          ]
+        },
+        "options": {
+          "includeMergedResponse": true,
+          "system": "={{ $(\"prompt template\").item.json.markdown }}",
+          "maxTokens": 500
+        }
+      },
+      "id": "459fd3f2-05e0-43e9-a8f9-ac57bd22a658",
+      "name": "brainstorm topic",
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        1296,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "gen-pillar",
+              "name": "pillar",
+              "type": "string",
+              "value": "={{ JSON.parse($json.merged_response.replace(/```json/g,'').replace(/```/g,'').trim()).pillar }}"
+            },
+            {
+              "id": "gen-topic",
+              "name": "topic",
+              "type": "string",
+              "value": "={{ JSON.parse($json.merged_response.replace(/```json/g,'').replace(/```/g,'').trim()).topic }}"
+            },
+            {
+              "id": "gen-language",
+              "name": "language",
+              "type": "string",
+              "value": "={{ (() => { const lastLang = ($(\"topic history\").item.json.lastLanguage || '').toUpperCase(); return lastLang.includes('EN') ? 'PT' : 'EN'; })() }}"
+            },
+            {
+              "id": "gen-note",
+              "name": "note",
+              "type": "string",
+              "value": "={{ JSON.parse($json.merged_response.replace(/```json/g,'').replace(/```/g,'').trim()).note }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "efe310cd-54a3-49d8-a4bf-ab11cbcf371f",
+      "name": "analyze generated idea",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1584,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "nq-id",
+              "name": "id",
+              "type": "string",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "id": "nq-pillar",
+              "name": "property_pillar",
+              "type": "string",
+              "value": "={{ $(\"analyze generated idea\").item.json.pillar }}"
+            },
+            {
+              "id": "nq-topic",
+              "name": "property_topic",
+              "type": "string",
+              "value": "={{ $(\"analyze generated idea\").item.json.topic }}"
+            },
+            {
+              "id": "nq-language",
+              "name": "property_language",
+              "type": "string",
+              "value": "={{ $(\"analyze generated idea\").item.json.language }}"
+            },
+            {
+              "id": "nq-note",
+              "name": "property_note",
+              "type": "string",
+              "value": "={{ $(\"analyze generated idea\").item.json.note }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b77c2333-75b3-45e2-9bbb-dff4e4c7eb2a",
+      "name": "idea queue format",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1984,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                2,
+                4
+              ],
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "0a33a4fc-e830-44f9-9f82-3444aaa38e25",
+      "name": "tue,thu 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -48,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "final-text-approved",
+              "name": "finalText",
+              "value": "={{ $('extract text').item.json.draftText }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0b7db579-3a02-47c6-b859-4aea5aad0389",
+      "name": "final text",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1440,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('current idea').item.json.id }}"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "Ready"
+            },
+            {
+              "key": "Post Draft|rich_text",
+              "textContent": "={{ $json.finalText }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0cbe10e8-7b6c-4a61-b94d-68ad6c473cf9",
+      "name": "Notion: mark ready (как есть)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        1664,
+        -16
+      ],
+      "credentials": {
+        "notionApi": {
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "final-text-edited",
+              "name": "finalText",
+              "value": "={{ $json.data.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f6af4bf3-38c7-4397-9b07-4ccd8df158b0",
+      "name": "final text edited",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1440,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('current idea').item.json.id }}"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "Ready"
+            },
+            {
+              "key": "Post Draft|rich_text",
+              "textContent": "={{ $json.finalText }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "90bbdb44-63af-451b-b61c-afbf6204c4a3",
+      "name": "Notion: mark as Ready (edited)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        1680,
+        224
+      ],
+      "credentials": {
+        "notionApi": {
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "✅ Принята отредактированная версия! Статус в Notion обновлён на \"Ready\" с твоим текстом.",
+        "additionalFields": {}
+      },
+      "id": "b3475010-202d-459e-a32d-762e0f5a6cd7",
+      "name": "confirm edited text",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1904,
+        224
+      ],
+      "webhookId": "7597a8d6-f559-4ea1-ad14-2f531d05a18f",
+      "credentials": {
+        "telegramApi": {
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "✅ Принято! Статус в Notion обновлён на \"Ready\", черновик сохранён без изменений.",
+        "additionalFields": {}
+      },
+      "id": "03d9032b-5afe-4b58-9ec4-bdef63a1d4de",
+      "name": " confirm",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1888,
+        -16
+      ],
+      "webhookId": "2ff4d0a5-61b0-46e4-9e46-98f3d2ba424e",
+      "credentials": {
+        "telegramApi": {
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "dataSourceId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_NOTION_DATABASE_ID",
+          "cachedResultName": "LinkedIn Content"
+        },
+        "title": "={{ $json.topic }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Pillar|select",
+              "selectValue": "={{ $json.pillar }}"
+            },
+            {
+              "key": "Language|select",
+              "selectValue": "={{ $json.language }}"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "Idea"
+            },
+            {
+              "key": "Note|rich_text",
+              "textContent": "={{ $json.note }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3d387969-38e4-47b3-9c62-8a244138430f",
+      "name": "generate idea",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        1792,
+        400
+      ],
+      "credentials": {
+        "notionApi": {
+          "name": "Notion account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Idea": {
+      "main": [
+        [
+          {
+            "node": "Idea+template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prompt template": {
+      "main": [
+        [
+          {
+            "node": "Idea+template",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Idea?": {
+      "main": [
+        [
+          {
+            "node": "current idea",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "chat history",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Idea+template": {
+      "main": [
+        [
+          {
+            "node": "Idea?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "draft generation": {
+      "main": [
+        [
+          {
+            "node": "extract text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract text": {
+      "main": [
+        [
+          {
+            "node": "send draft and wait for response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "current idea": {
+      "main": [
+        [
+          {
+            "node": "draft generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "chat history": {
+      "main": [
+        [
+          {
+            "node": "topic history",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brave Search: trends": {
+      "main": [
+        [
+          {
+            "node": "brainstorm topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "topic history": {
+      "main": [
+        [
+          {
+            "node": "Brave Search: trends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send draft and wait for response": {
+      "main": [
+        [
+          {
+            "node": "approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "approved?": {
+      "main": [
+        [
+          {
+            "node": "final text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "final text edited",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "brainstorm topic": {
+      "main": [
+        [
+          {
+            "node": "analyze generated idea",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "analyze generated idea": {
+      "main": [
+        [
+          {
+            "node": "generate idea",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "idea queue format": {
+      "main": [
+        [
+          {
+            "node": "current idea",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "tue,thu 09:00": {
+      "main": [
+        [
+          {
+            "node": "Idea",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "prompt template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "final text": {
+      "main": [
+        [
+          {
+            "node": "Notion: mark ready (как есть)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: mark ready (как есть)": {
+      "main": [
+        [
+          {
+            "node": " confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "final text edited": {
+      "main": [
+        [
+          {
+            "node": "Notion: mark as Ready (edited)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: mark as Ready (edited)": {
+      "main": [
+        [
+          {
+            "node": "confirm edited text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "generate idea": {
+      "main": [
+        [
+          {
+            "node": "idea queue format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
